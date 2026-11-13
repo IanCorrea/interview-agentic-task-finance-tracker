@@ -228,6 +228,10 @@ test.describe("Categorization rule management", () => {
       await targets.first().getByTestId("delete-rule").click();
       await page.getByTestId("delete-rule-confirm").click();
       await expect(page.getByTestId("delete-rule-dialog")).toBeHidden();
+      // Wait for the list to refetch before counting again: otherwise the
+      // next iteration can still see the deleted row, try to click it, and
+      // hang until the test timeout once the row is detached.
+      await expect(targets).toHaveCount(count - 1);
     }
 
     // The previously-imported BIEDRONKA row keeps its Groceries category.
