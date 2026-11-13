@@ -56,7 +56,10 @@ test.describe("Categories CRUD", () => {
     await page.getByRole("button", { name: "Add Category" }).click();
     await page.getByLabel("Name").fill("Edit Me");
     await page.getByRole("button", { name: "Create Category" }).click();
-    await expect(page.getByText("Edit Me")).toBeVisible();
+    // Scoped to <main>: the create/edit dialog (rendered outside <main>) lists
+    // every category as a "Parent Category" option and is still in the DOM
+    // for a moment after saving, so a page-wide getByText matches twice.
+    await expect(page.getByRole("main").getByText("Edit Me")).toBeVisible();
 
     const row = page.getByTestId("category-row").filter({ hasText: "Edit Me" });
     await row.getByTestId("edit-category").click();
@@ -67,7 +70,9 @@ test.describe("Categories CRUD", () => {
     await page.getByRole("button", { name: "Save Changes" }).click();
 
     await expect(page.getByRole("heading", { name: "Edit" })).toBeHidden();
-    await expect(page.getByText("Edit Me Updated")).toBeVisible();
+    await expect(
+      page.getByRole("main").getByText("Edit Me Updated"),
+    ).toBeVisible();
   });
 
   test("changes a category's parent", async ({ page }) => {
@@ -86,7 +91,7 @@ test.describe("Categories CRUD", () => {
     await page.getByLabel("Parent Category").selectOption("Target Parent");
     await page.getByRole("button", { name: "Save Changes" }).click();
 
-    await expect(page.getByText("Move Me")).toBeVisible();
+    await expect(page.getByRole("main").getByText("Move Me")).toBeVisible();
   });
 
   test("deletes a category with no children", async ({ page }) => {

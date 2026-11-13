@@ -5,6 +5,22 @@ embedded PGlite), TanStack Query, Tailwind/shadcn UI and Paraglide i18n.
 
 **Your task is in [TASK.md](TASK.md).**
 
+## Solution: monthly category budgets
+
+[![Budgets page — click to watch the demo](demo/budgets-page.png)](demo/budgets-demo.webm)
+
+**Demo video (1 min 49 s):** [demo/budgets-demo.webm](demo/budgets-demo.webm) —
+one scene per acceptance criterion, recorded by `node scripts/record-demo.mjs`.
+
+- **Design, decisions and known limitations:** [docs/KICKOFF.md](docs/KICKOFF.md)
+- **Agent team used to build it:** [.claude/agents/](.claude/agents/) — lead +
+  domain, alerts, compliance, frontend, QA and tech-lead reviewer
+- **Where the code is:** `src/server/budgets.server.ts` (domain),
+  `src/server/budget-alerts.server.ts` (email, max one per budget per month),
+  `src/routes/_authed/budgets.tsx` (page), `drizzle/0004_*.sql` (migration)
+- **Tests:** `tests/budgets.test.ts`, `tests/budget-alerts.test.ts`,
+  `tests/compliance.test.ts`, `tests/e2e/budgets.spec.ts`
+
 ## Getting started
 
 Requirements: Node.js 22+ and pnpm 10 (`corepack enable` will pick up the

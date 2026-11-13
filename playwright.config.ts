@@ -8,11 +8,17 @@ export default defineConfig({
   // Specs other than setup get a fresh, isolated user per test, so they run
   // in parallel. The setup project stays serial because it exercises the
   // global "no users yet" redirect.
-  workers: process.env.CI ? 4 : undefined,
+  // Locally the default (half the CPU cores) overloads the single production
+  // server on modest machines and tests die on 30s timeouts; 2 is reliable.
+  workers: process.env.CI ? 4 : 2,
   reporter: "html",
   use: {
     baseURL: "http://127.0.0.1:3000",
     trace: "on-first-retry",
+    // Pin the browser timezone so date assertions do not depend on the
+    // machine running the tests (the transaction list formats dates in the
+    // browser's local timezone).
+    timezoneId: "UTC",
   },
   projects: [
     {
