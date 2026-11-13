@@ -151,13 +151,15 @@ function BudgetItem({
       data-testid="budget-row"
       data-over={budget.isOver ? "true" : "false"}
     >
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
         <span
           className="size-4 shrink-0 rounded-full border border-border/50 shadow-sm"
           style={{ backgroundColor: color }}
           aria-hidden="true"
         />
-        <span className="flex-1 min-w-0 text-sm font-medium truncate">
+        {/* min-w keeps the category name readable on narrow screens: the
+            badge and the actions wrap to the next line instead of crushing it. */}
+        <span className="flex-1 min-w-[9rem] text-sm font-medium truncate">
           {categoryLabel(budget.categoryName, budget.parentCategoryName)}
         </span>
         {budget.isOver && (
