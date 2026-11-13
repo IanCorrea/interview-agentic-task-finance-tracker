@@ -20,7 +20,8 @@ playwright-report/
 .playwright-cli
 .playwright-mcp
 .agents
-.claude
+.claude/*
+!.claude/agents/
 .cursorrules
 .mcp.json
 lat.md/.cache
