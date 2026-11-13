@@ -21,6 +21,12 @@ async function createAccount(page: Page, name: string) {
 async function importCsv(page: Page, fileName: string, accountLabel: string) {
   // Round-trip via Dashboard so the Import component unmounts and resets between calls.
   await page.getByRole("link", { name: "Dashboard" }).click();
+  // Race: every navigation awaits the root beforeLoad (a server call), so
+  // clicking "Import" before Dashboard has rendered supersedes that navigation
+  // and the Import page never unmounts (it stays on "Import complete").
+  await expect(
+    page.getByRole("heading", { name: "Dashboard", exact: true }),
+  ).toBeVisible();
   await page.getByRole("link", { name: "Import" }).click();
 
   // Upload step — click the "Choose File" label to open the native file chooser
@@ -130,6 +136,11 @@ test.describe("CSV import duplicate detection", () => {
 
     // Start a second import; stop on the preview step and check badges.
     await page.getByRole("link", { name: "Dashboard" }).click();
+    // Race: wait for Dashboard to render, or the "Import" click supersedes the
+    // pending navigation and the Import page keeps its "Import complete" step.
+    await expect(
+      page.getByRole("heading", { name: "Dashboard", exact: true }),
+    ).toBeVisible();
     await page.getByRole("link", { name: "Import" }).click();
 
     // Upload step — click the "Choose File" label to open the native file chooser

@@ -23,6 +23,12 @@ async function importCsv(
   accountLabel: string,
 ) {
   await page.getByRole("link", { name: "Dashboard" }).click();
+  // Race: every navigation awaits the root beforeLoad (a server call), so
+  // clicking "Import" before Dashboard has rendered supersedes that navigation
+  // and the Import page never unmounts (it stays on "Import complete").
+  await expect(
+    page.getByRole("heading", { name: "Dashboard", exact: true }),
+  ).toBeVisible();
   await page.getByRole("link", { name: "Import" }).click();
 
   // Upload step — click the "Choose File" label to open the native file chooser
