@@ -5,6 +5,7 @@ import { db, schema } from "#/db";
 import { isEmailVerified, requireUserId } from "#/server/session";
 import { categorizeDescription, isAIVisible } from "#/server/ai";
 import { checkSpendCap } from "#/server/ai-usage.server";
+import { runBudgetAlertCheck } from "#/server/budget-alerts.server";
 import { formatMinor, parseAmountToMinor } from "#/lib/money";
 import {
   MAX_IMPORT_FILE_BYTES,
@@ -1076,6 +1077,7 @@ async function* streamConfirmImport(
       row_count: insertRows.length,
     });
     await db.insert(schema.transactions).values(insertRows);
+    await runBudgetAlertCheck(userId);
 
     if (aiRulesToCreate.length > 0) {
       const aiRulesInsert = aiRulesToCreate.map((rule) => ({
@@ -1230,6 +1232,8 @@ export const deleteImportBatch = createServerFn({ method: "POST" })
           eq(schema.import_batches.user_id, userId),
         ),
       );
+
+    await runBudgetAlertCheck(userId);
 
     return { success: true, deletedTransactions: transactionIds.length };
   });

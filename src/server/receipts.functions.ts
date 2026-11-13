@@ -8,6 +8,7 @@ import {
   checkScanAllowed,
   getMonthlyUsageSummary,
 } from "#/server/ai-usage.server";
+import { runBudgetAlertCheck } from "#/server/budget-alerts.server";
 import { decimalToMinor, formatMinor } from "#/lib/money";
 import {
   MAX_RECEIPT_IMAGES,
@@ -533,6 +534,8 @@ export const saveReceiptAndLink = createServerFn({ method: "POST" })
         .update(schema.receipts)
         .set({ transaction_id: txnId })
         .where(eq(schema.receipts.id, receiptId));
+
+      await runBudgetAlertCheck(userId);
 
       transaction = await db
         .select({

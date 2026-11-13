@@ -12,6 +12,7 @@ import {
   sweepExpiredDeletions,
   toCsv,
 } from "../src/server/compliance.server.ts";
+import { deleteCategoryForUser } from "../src/server/categories.server.ts";
 import { storage } from "../src/server/storage.ts";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -58,6 +59,18 @@ async function seedFullUser(userId: string) {
     pattern: "grocery",
     category_id: `${userId}-cat`,
   });
+  await db.insert(schema.budgets).values({
+    id: `${userId}-budget`,
+    user_id: userId,
+    category_id: `${userId}-cat`,
+    limit_minor: 50000,
+  });
+  await db.insert(schema.budget_alerts).values({
+    id: `${userId}-alert`,
+    user_id: userId,
+    category_id: `${userId}-cat`,
+    month: "2026-07",
+  });
   const imageKey = `receipts/${userId}/test.jpg`;
   await storage.put(imageKey, new Uint8Array([0xff, 0xd8, 0xff, 0x42]));
   await db.insert(schema.receipts).values({
@@ -88,6 +101,14 @@ async function seedFullUser(userId: string) {
   });
   return { imageKey };
 }
+
+const budgetsOf = (userId: string) =>
+  db.select().from(schema.budgets).where(eq(schema.budgets.user_id, userId));
+const alertsOf = (userId: string) =>
+  db
+    .select()
+    .from(schema.budget_alerts)
+    .where(eq(schema.budget_alerts.user_id, userId));
 
 async function wipeUser(userId: string) {
   // hardDeleteUser is itself under test — clean up with it, it's idempotent.
@@ -125,6 +146,11 @@ describe("compliance: data export", () => {
     expect(json.receipts[0].image_file).toBe(`receipts/${userId}-rcpt.jpg`);
     expect(json.categorizationRules).toHaveLength(1);
     expect(json.subscription.plan).toBe("free");
+    expect(json.budgets).toHaveLength(1);
+    expect(json.budgets[0].category_id).toBe(`${userId}-cat`);
+    expect(json.budgets[0].limit_minor).toBe(50000);
+    expect(json.budgetAlerts).toHaveLength(1);
+    expect(json.budgetAlerts[0].month).toBe("2026-07");
 
     const txnCsv = strFromU8(files["transactions.csv"]);
     expect(txnCsv).toContain('"Grocery store"');
@@ -134,10 +160,36 @@ describe("compliance: data export", () => {
     expect(strFromU8(files["accounts.csv"])).toContain('"Checking"');
     expect(strFromU8(files["categories.csv"])).toContain('"Groceries"');
     expect(strFromU8(files["categorization_rules.csv"])).toContain('"grocery"');
+    const budgetsCsv = strFromU8(files["budgets.csv"]);
+    expect(budgetsCsv.split("\n")[0]).toBe(
+      '"id","category","limit","limit_minor","created_at","updated_at"',
+    );
+    expect(budgetsCsv).toContain(
+      `"${userId}-budget","Groceries","500.00","50000"`,
+    );
 
     expect(Array.from(files[`receipts/${userId}-rcpt.jpg`])).toEqual([
       0xff, 0xd8, 0xff, 0x42,
     ]);
+  });
+
+  it("never includes another user's budgets", async () => {
+    const otherId = "export-test-other";
+    await seedFullUser(userId);
+    await seedFullUser(otherId);
+    try {
+      const files = unzipSync(await buildExportZip(userId));
+      const json = JSON.parse(strFromU8(files["export.json"]));
+      expect(json.budgets.map((b: { id: string }) => b.id)).toEqual([
+        `${userId}-budget`,
+      ]);
+      expect(json.budgetAlerts.map((a: { id: string }) => a.id)).toEqual([
+        `${userId}-alert`,
+      ]);
+      expect(strFromU8(files["budgets.csv"])).not.toContain(otherId);
+    } finally {
+      await wipeUser(otherId);
+    }
   });
 });
 
@@ -160,11 +212,164 @@ describe("compliance: account hard delete", () => {
       db.select().from(schema.receipt_items).where(eq(schema.receipt_items.receipt_id, `${userId}-rcpt`)),
       db.select().from(schema.ai_usage).where(eq(schema.ai_usage.user_id, userId)),
       db.select().from(schema.subscriptions).where(eq(schema.subscriptions.user_id, userId)),
+      db.select().from(schema.budgets).where(eq(schema.budgets.user_id, userId)),
+      db.select().from(schema.budget_alerts).where(eq(schema.budget_alerts.user_id, userId)),
     ]);
     for (const rows of remaining) {
       expect.soft(rows).toHaveLength(0);
     }
     expect(await storage.get(imageKey)).toBeNull();
+  });
+
+  it("leaves another user's budgets and alert ledger untouched", async () => {
+    const otherId = "delete-test-other";
+    await seedFullUser(userId);
+    await seedFullUser(otherId);
+    try {
+      await hardDeleteUser(userId);
+
+      expect(await budgetsOf(userId)).toHaveLength(0);
+      expect(await alertsOf(userId)).toHaveLength(0);
+      expect(await budgetsOf(otherId)).toHaveLength(1);
+      expect(await alertsOf(otherId)).toHaveLength(1);
+    } finally {
+      await wipeUser(otherId);
+    }
+  });
+});
+
+describe("compliance: category deletion with budgets", () => {
+  const userId = "catdel-test-user";
+  const otherId = "catdel-test-other";
+  afterEach(async () => {
+    await wipeUser(userId);
+    await wipeUser(otherId);
+  });
+
+  const categoriesOf = (id: string) =>
+    db.select().from(schema.categories).where(eq(schema.categories.user_id, id));
+  const rulesOf = (id: string) =>
+    db
+      .select()
+      .from(schema.categorization_rules)
+      .where(eq(schema.categorization_rules.user_id, id));
+  const transactionCategory = async (id: string) => {
+    const [txn] = await db
+      .select({ category_id: schema.transactions.category_id })
+      .from(schema.transactions)
+      .where(eq(schema.transactions.id, id));
+    return txn.category_id;
+  };
+
+  it("deletes the budgets and alert ledger of the category and its descendants", async () => {
+    await seedFullUser(userId);
+    await seedFullUser(otherId);
+    // Child and grandchild with their own budgets, plus an unrelated category.
+    await db.insert(schema.categories).values([
+      { id: `${userId}-child`, user_id: userId, name: "Bakery", parent_id: `${userId}-cat` },
+      { id: `${userId}-grand`, user_id: userId, name: "Bread", parent_id: `${userId}-child` },
+      { id: `${userId}-keep`, user_id: userId, name: "Transport" },
+    ]);
+    await db.insert(schema.budgets).values([
+      { id: `${userId}-b-child`, user_id: userId, category_id: `${userId}-child`, limit_minor: 100 },
+      { id: `${userId}-b-grand`, user_id: userId, category_id: `${userId}-grand`, limit_minor: 200 },
+      { id: `${userId}-b-keep`, user_id: userId, category_id: `${userId}-keep`, limit_minor: 300 },
+    ]);
+    await db.insert(schema.budget_alerts).values([
+      { id: `${userId}-a-grand`, user_id: userId, category_id: `${userId}-grand`, month: "2026-07" },
+      { id: `${userId}-a-keep`, user_id: userId, category_id: `${userId}-keep`, month: "2026-07" },
+    ]);
+
+    const result = await deleteCategoryForUser(userId, { id: `${userId}-cat` });
+    expect(result).toEqual({ success: true });
+
+    expect((await categoriesOf(userId)).map((c) => c.id)).toEqual([`${userId}-keep`]);
+    expect((await budgetsOf(userId)).map((b) => b.id)).toEqual([`${userId}-b-keep`]);
+    expect((await alertsOf(userId)).map((a) => a.id)).toEqual([`${userId}-a-keep`]);
+
+    // Existing behaviour is preserved: transaction and receipt item are
+    // uncategorized, the rule is gone.
+    expect(await transactionCategory(`${userId}-txn`)).toBeNull();
+    const [item] = await db
+      .select()
+      .from(schema.receipt_items)
+      .where(eq(schema.receipt_items.id, `${userId}-item`));
+    expect(item.category_id).toBeNull();
+    expect(await rulesOf(userId)).toHaveLength(0);
+
+    // The other user is untouched.
+    expect(await categoriesOf(otherId)).toHaveLength(1);
+    expect(await budgetsOf(otherId)).toHaveLength(1);
+    expect(await alertsOf(otherId)).toHaveLength(1);
+  });
+
+  it("reassigns transactions and keeps the target category's budget", async () => {
+    await seedFullUser(userId);
+    await db.insert(schema.categories).values({
+      id: `${userId}-keep`,
+      user_id: userId,
+      name: "Transport",
+    });
+    await db.insert(schema.budgets).values({
+      id: `${userId}-b-keep`,
+      user_id: userId,
+      category_id: `${userId}-keep`,
+      limit_minor: 300,
+    });
+
+    const result = await deleteCategoryForUser(userId, {
+      id: `${userId}-cat`,
+      reassignToCategoryId: `${userId}-keep`,
+    });
+    expect(result).toEqual({ success: true });
+
+    expect(await transactionCategory(`${userId}-txn`)).toBe(`${userId}-keep`);
+    expect((await budgetsOf(userId)).map((b) => b.id)).toEqual([`${userId}-b-keep`]);
+    expect(await alertsOf(userId)).toHaveLength(0);
+  });
+
+  it("refuses to delete another user's category and leaves its data alone", async () => {
+    await seedFullUser(userId);
+    await seedFullUser(otherId);
+
+    const result = await deleteCategoryForUser(userId, { id: `${otherId}-cat` });
+    expect(result).toEqual({ error: "Category not found" });
+
+    expect(await categoriesOf(otherId)).toHaveLength(1);
+    expect(await budgetsOf(otherId)).toHaveLength(1);
+    expect(await alertsOf(otherId)).toHaveLength(1);
+    expect(await rulesOf(otherId)).toHaveLength(1);
+    expect(await transactionCategory(`${otherId}-txn`)).toBe(`${otherId}-cat`);
+  });
+
+  it("rejects reassigning to a descendant or to a foreign category", async () => {
+    await seedFullUser(userId);
+    await seedFullUser(otherId);
+    await db.insert(schema.categories).values({
+      id: `${userId}-child`,
+      user_id: userId,
+      name: "Bakery",
+      parent_id: `${userId}-cat`,
+    });
+
+    expect(
+      await deleteCategoryForUser(userId, {
+        id: `${userId}-cat`,
+        reassignToCategoryId: `${userId}-child`,
+      }),
+    ).toEqual({
+      error: "Cannot reassign transactions to the category being deleted",
+    });
+    expect(
+      await deleteCategoryForUser(userId, {
+        id: `${userId}-cat`,
+        reassignToCategoryId: `${otherId}-cat`,
+      }),
+    ).toEqual({ error: "Reassignment target category does not exist" });
+
+    expect(await categoriesOf(userId)).toHaveLength(2);
+    expect(await budgetsOf(userId)).toHaveLength(1);
+    expect(await transactionCategory(`${userId}-txn`)).toBe(`${userId}-cat`);
   });
 });
 
