@@ -39,6 +39,9 @@ export async function sendEmail(message: EmailMessage): Promise<void> {
     case "resend": {
       const response = await fetch("https://api.resend.com/emails", {
         method: "POST",
+        // Emails are sent inside user requests (e.g. the over-budget alert
+        // after a transaction write) — never let a hung provider hold one.
+        signal: AbortSignal.timeout(10_000),
         headers: {
           Authorization: `Bearer ${env.email.resendApiKey}`,
           "Content-Type": "application/json",

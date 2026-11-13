@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as VerifyEmailRouteImport } from './routes/verify-email'
 import { Route as TestSetPlanRouteImport } from './routes/test-set-plan'
+import { Route as TestSeedTransactionsRouteImport } from './routes/test-seed-transactions'
 import { Route as TestSeedAiUsageRouteImport } from './routes/test-seed-ai-usage'
 import { Route as TestRunSweepRouteImport } from './routes/test-run-sweep'
 import { Route as TestEmailsRouteImport } from './routes/test-emails'
@@ -53,6 +54,11 @@ const VerifyEmailRoute = VerifyEmailRouteImport.update({
 const TestSetPlanRoute = TestSetPlanRouteImport.update({
   id: '/test-set-plan',
   path: '/test-set-plan',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TestSeedTransactionsRoute = TestSeedTransactionsRouteImport.update({
+  id: '/test-seed-transactions',
+  path: '/test-seed-transactions',
   getParentRoute: () => rootRouteImport,
 } as any)
 const TestSeedAiUsageRoute = TestSeedAiUsageRouteImport.update({
@@ -239,6 +245,7 @@ export interface FileRoutesByFullPath {
   '/test-emails': typeof TestEmailsRoute
   '/test-run-sweep': typeof TestRunSweepRoute
   '/test-seed-ai-usage': typeof TestSeedAiUsageRoute
+  '/test-seed-transactions': typeof TestSeedTransactionsRoute
   '/test-set-plan': typeof TestSetPlanRoute
   '/verify-email': typeof VerifyEmailRoute
   '/accounts': typeof AuthedAccountsRoute
@@ -275,6 +282,7 @@ export interface FileRoutesByTo {
   '/test-emails': typeof TestEmailsRoute
   '/test-run-sweep': typeof TestRunSweepRoute
   '/test-seed-ai-usage': typeof TestSeedAiUsageRoute
+  '/test-seed-transactions': typeof TestSeedTransactionsRoute
   '/test-set-plan': typeof TestSetPlanRoute
   '/verify-email': typeof VerifyEmailRoute
   '/accounts': typeof AuthedAccountsRoute
@@ -313,6 +321,7 @@ export interface FileRoutesById {
   '/test-emails': typeof TestEmailsRoute
   '/test-run-sweep': typeof TestRunSweepRoute
   '/test-seed-ai-usage': typeof TestSeedAiUsageRoute
+  '/test-seed-transactions': typeof TestSeedTransactionsRoute
   '/test-set-plan': typeof TestSetPlanRoute
   '/verify-email': typeof VerifyEmailRoute
   '/_authed/accounts': typeof AuthedAccountsRoute
@@ -351,6 +360,7 @@ export interface FileRouteTypes {
     | '/test-emails'
     | '/test-run-sweep'
     | '/test-seed-ai-usage'
+    | '/test-seed-transactions'
     | '/test-set-plan'
     | '/verify-email'
     | '/accounts'
@@ -387,6 +397,7 @@ export interface FileRouteTypes {
     | '/test-emails'
     | '/test-run-sweep'
     | '/test-seed-ai-usage'
+    | '/test-seed-transactions'
     | '/test-set-plan'
     | '/verify-email'
     | '/accounts'
@@ -424,6 +435,7 @@ export interface FileRouteTypes {
     | '/test-emails'
     | '/test-run-sweep'
     | '/test-seed-ai-usage'
+    | '/test-seed-transactions'
     | '/test-set-plan'
     | '/verify-email'
     | '/_authed/accounts'
@@ -462,6 +474,7 @@ export interface RootRouteChildren {
   TestEmailsRoute: typeof TestEmailsRoute
   TestRunSweepRoute: typeof TestRunSweepRoute
   TestSeedAiUsageRoute: typeof TestSeedAiUsageRoute
+  TestSeedTransactionsRoute: typeof TestSeedTransactionsRoute
   TestSetPlanRoute: typeof TestSetPlanRoute
   VerifyEmailRoute: typeof VerifyEmailRoute
   ApiExportDataRoute: typeof ApiExportDataRoute
@@ -482,6 +495,13 @@ declare module '@tanstack/react-router' {
       path: '/test-set-plan'
       fullPath: '/test-set-plan'
       preLoaderRoute: typeof TestSetPlanRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/test-seed-transactions': {
+      id: '/test-seed-transactions'
+      path: '/test-seed-transactions'
+      fullPath: '/test-seed-transactions'
+      preLoaderRoute: typeof TestSeedTransactionsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/test-seed-ai-usage': {
@@ -791,6 +811,7 @@ const rootRouteChildren: RootRouteChildren = {
   TestEmailsRoute: TestEmailsRoute,
   TestRunSweepRoute: TestRunSweepRoute,
   TestSeedAiUsageRoute: TestSeedAiUsageRoute,
+  TestSeedTransactionsRoute: TestSeedTransactionsRoute,
   TestSetPlanRoute: TestSetPlanRoute,
   VerifyEmailRoute: VerifyEmailRoute,
   ApiExportDataRoute: ApiExportDataRoute,

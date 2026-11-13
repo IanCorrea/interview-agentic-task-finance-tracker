@@ -82,15 +82,23 @@ export async function checkBudgetAlerts(
       });
       sent++;
     } catch (error) {
-      // Release the claim so a later write can retry the email.
-      await db
-        .delete(schema.budget_alerts)
-        .where(
-          and(
-            eq(schema.budget_alerts.id, claimed[0].id),
-            eq(schema.budget_alerts.user_id, userId),
-          ),
-        );
+      // A timeout is ambiguous: the provider may have accepted the message.
+      // "Max one email per budget per month" wins over retrying, so the claim
+      // is kept. Any other failure means nothing was sent — release the claim
+      // so a later write can retry the email.
+      const ambiguous =
+        error instanceof Error &&
+        (error.name === "TimeoutError" || error.name === "AbortError");
+      if (!ambiguous) {
+        await db
+          .delete(schema.budget_alerts)
+          .where(
+            and(
+              eq(schema.budget_alerts.id, claimed[0].id),
+              eq(schema.budget_alerts.user_id, userId),
+            ),
+          );
+      }
       // Ids only — never amounts or category names in logs.
       getLogger().error(
         { err: error, userId, categoryId: status.categoryId, month },

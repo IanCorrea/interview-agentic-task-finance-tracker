@@ -21,6 +21,28 @@ Project conventions live in [CLAUDE.md](../CLAUDE.md) and are binding.
 Non-goals: budget history per month, rollover of unused amounts, multi-currency
 conversion, alerts by channels other than email.
 
+## Known limitations (found in review, accepted for this iteration)
+
+- **Receipt-scan transactions do not count as spending.** They are stored with
+  a positive `amount_minor` (`receipts.functions.ts`), which predates this
+  feature — the dashboard also treats them as income. Budgets sum only
+  negative amounts, so a scanned receipt neither increases "spent" nor
+  triggers the email. Fixing the sign changes existing behaviour (receipt
+  dedup `source_ref`, receipts E2E) and was left out of scope on purpose.
+- **Only the current UTC month is evaluated.** A back-dated transaction that
+  pushes a past month over its limit sends no email, and users far from UTC
+  see the month switch a few hours early or late.
+- **Email delivery is at-most-once.** A provider timeout keeps the ledger
+  claim (the message may have been accepted), so that month's alert is not
+  retried; a definite failure releases the claim and the next write retries.
+- **One display currency.** Amounts are shown with the dashboard's currency
+  label and summed across accounts without conversion.
+- **Export.** Budgets are in `export.json` and `budgets.csv`; the alert ledger
+  is in `export.json` only.
+- The free-plan limit race is closed with a row lock on the user
+  (`createBudget`); the same check-then-insert race still exists for accounts
+  (`checkAccountLimit`), which is pre-existing code.
+
 ## Foundation (done by the lead before fan-out)
 
 - `src/db/schema.ts` — `budgets`, `budget_alerts`; migration `drizzle/0004_*.sql`.

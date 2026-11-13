@@ -158,13 +158,7 @@ function BudgetItem({
           aria-hidden="true"
         />
         <span className="flex-1 min-w-0 text-sm font-medium truncate">
-          {budget.parentCategoryName && (
-            <span className="text-muted-foreground font-normal">
-              {budget.parentCategoryName}
-              {" › "}
-            </span>
-          )}
-          {budget.categoryName}
+          {categoryLabel(budget.categoryName, budget.parentCategoryName)}
         </span>
         {budget.isOver && (
           <Badge variant="destructive" data-testid="budget-over-badge">

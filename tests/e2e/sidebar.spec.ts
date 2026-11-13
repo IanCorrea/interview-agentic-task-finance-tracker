@@ -10,9 +10,20 @@ test.describe("Sidebar Navigation", () => {
   test("sidebar navigation is visible on desktop", async ({ page }) => {
     await expect(page.getByRole("link", { name: "Dashboard" })).toBeVisible();
     await expect(page.getByRole("link", { name: "Categories" })).toBeVisible();
+    await expect(
+      page
+        .getByRole("navigation", { name: "Main navigation" })
+        .getByRole("link", { name: "Budgets" }),
+    ).toBeVisible();
   });
 
   test("sidebar navigation links work correctly", async ({ page }) => {
+    await page.getByRole("link", { name: "Budgets" }).click();
+    await expect(page).toHaveURL("/budgets");
+    await expect(
+      page.getByRole("heading", { name: "Budgets", exact: true }),
+    ).toBeVisible();
+
     await page.getByRole("link", { name: "Categories" }).click();
     await expect(page).toHaveURL("/categories");
     await expect(
@@ -37,6 +48,7 @@ test.describe("Sidebar Navigation", () => {
 
     await expect(page.getByRole("link", { name: "Dashboard" })).toBeVisible();
     await expect(page.getByRole("link", { name: "Categories" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Budgets" })).toBeVisible();
 
     await page.getByRole("button", { name: "Close sidebar" }).click();
 

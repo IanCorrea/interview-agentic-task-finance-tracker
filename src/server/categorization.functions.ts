@@ -481,6 +481,10 @@ export const reCategorizeTransactions = createServerFn({ method: "POST" })
       }
     }
 
+    // Before the rules insert: the transactions are already updated, so the
+    // alert check must run even if saving the AI rules fails.
+    if (updated > 0) await runBudgetAlertCheck(userId);
+
     if (aiRulesToCreate.length > 0) {
       const aiRulesInsert = aiRulesToCreate.map((rule) => ({
         id: crypto.randomUUID(),
@@ -493,8 +497,6 @@ export const reCategorizeTransactions = createServerFn({ method: "POST" })
       }));
       await db.insert(schema.categorization_rules).values(aiRulesInsert);
     }
-
-    if (updated > 0) await runBudgetAlertCheck(userId);
 
     return { updated, aiCategorized, skipped };
   });
