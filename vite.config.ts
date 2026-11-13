@@ -38,6 +38,10 @@ const config = defineConfig({
     environment: "jsdom",
     globals: true,
     setupFiles: ["./tests/setup.ts"],
+    // In-memory PGlite boot + migrations can exceed the 5s default when the
+    // whole suite runs in parallel on slower machines.
+    testTimeout: 30_000,
+    hookTimeout: 30_000,
   },
 });
 
